@@ -1,10 +1,11 @@
 // ИЗМЕНЕНО: src/App.tsx
 
-import React, { useState, useEffect } from 'react'; // ИЗМЕНЕНО: Убраны неиспользуемые импорты
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import BoardSettings from './features/Settings/BoardSettings';
-import TaskChecklist from './features/Tasks/TaskChecklist'; // ИЗМЕНЕНО: Импортируем новый компонент
-import type { Project, Status, User, Task, ChecklistItem } from './types'; // ИЗМЕНЕНО: Импортируем все типы из одного файла
+import TaskChecklist from './features/Tasks/TaskChecklist';
+// ИЗМЕНЕНО: Убран неиспользуемый 'Column' для успешной сборки
+import type { Project, Status, User, Task, ChecklistItem } from './types'; 
 
 // --- ГЛОБАЛЬНЫЕ СТИЛИ (без изменений) ---
 const GlobalStyles = () => (
@@ -141,7 +142,76 @@ function TaskDetailModal({ task, members, statuses, onClose, onUpdate, onDelete,
 }
 
 // --- СТРАНИЦЫ / ФИЧИ ---
-function LoginPage({ onLogin, onRequireSetPassword }: { onLogin: (token: string) => void; onRequireSetPassword: (tempToken: string) => void; }) { const [login, setLogin] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); setError(''); try { const response = await axios.post<{ token: string } | { setPasswordRequired: boolean; tempToken: string }>('/api/auth/login', { login, password }); if ('token' in response.data) { onLogin(response.data.token); } else if (response.data.setPasswordRequired) { onRequireSetPassword(response.data.tempToken); } } catch (err: any) { setError('Неверный логин или пароль'); } }; return (<div className="card"><h1 className="card-title">Task Manager</h1>{error && <p className="error-message">{error}</p>}<form onSubmit={handleSubmit}><input type="text" value={login} onChange={e => setLogin(e.target.value)} placeholder="Логин" className="input" /><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Пароль" className="input" /><button type="submit" className="btn btn-primary btn-full">Войти</button></form></div>); }
+
+// ЗАМЕНЕН КОМПОНЕНТ LoginPage для добавления регистрации
+function LoginPage({ onLogin, onRequireSetPassword }: { onLogin: (token: string) => void; onRequireSetPassword: (tempToken: string) => void; }) {
+    const [isRegistering, setIsRegistering] = useState(false);
+    const [login, setLogin] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+
+        if (isRegistering) {
+            if (password !== confirmPassword) {
+                setError('Пароли не совпадают.');
+                return;
+            }
+            try {
+                const response = await axios.post<{ token: string }>('/api/auth/register', { login, password });
+                alert('Регистрация прошла успешно! Теперь вы можете войти.');
+                setIsRegistering(false); 
+            } catch (err: any) {
+                setError(err.response?.data?.message || 'Ошибка регистрации.');
+            }
+            return;
+        }
+
+        try {
+            const response = await axios.post<{ token: string } | { setPasswordRequired: boolean; tempToken: string }>('/api/auth/login', { login, password });
+            if ('token' in response.data) {
+                onLogin(response.data.token);
+            } else if (response.data.setPasswordRequired) {
+                onRequireSetPassword(response.data.tempToken);
+            }
+        } catch (err: any) {
+            setError('Неверный логин или пароль');
+        }
+    };
+
+    return (
+        <div className="card">
+            <h1 className="card-title">{isRegistering ? 'Регистрация' : 'Task Manager'}</h1>
+            {error && <p className="error-message">{error}</p>}
+            <form onSubmit={handleSubmit}>
+                <input type="text" value={login} onChange={e => setLogin(e.target.value)} placeholder="Логин" className="input" />
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Пароль" className="input" />
+                {isRegistering && (
+                    <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Подтвердите пароль" className="input" />
+                )}
+                <button type="submit" className="btn btn-primary btn-full">
+                    {isRegistering ? 'Зарегистрироваться' : 'Войти'}
+                </button>
+            </form>
+            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                <button
+                    onClick={() => {
+                        setIsRegistering(!isRegistering);
+                        setError('');
+                    }}
+                    className="btn-light"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary-color)' }}
+                >
+                    {isRegistering ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 function SetPasswordPage({ onPasswordSet, tempToken }: { onPasswordSet: (token: string) => void, tempToken: string }) { const [password, setPassword] = useState(''); const [confirmPassword, setConfirmPassword] = useState(''); const [error, setError] = useState(''); const handleSubmit = async (e: React.FormEvent) => { e.preventDefault(); setError(''); if (password.length < 6) { setError('Пароль должен быть не менее 6 символов.'); return; } if (password !== confirmPassword) { setError('Пароли не совпадают.'); return; } try { const response = await axios.post<{ token: string }>('/api/auth/set-password', { password }, { headers: { Authorization: `Bearer ${tempToken}` } }); alert('Пароль успешно установлен!'); onPasswordSet(response.data.token); } catch (err: any) { setError(err.response?.data?.message || 'Не удалось установить пароль.'); } }; return (<div className="card"><h1 className="card-title">Установите ваш пароль</h1><p style={{ color: '#6c757d', marginBottom: '24px' }}>Чтобы продолжить, создайте пароль для вашего аккаунта.</p>{error && <p className="error-message">{error}</p>}<form onSubmit={handleSubmit}><input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Новый пароль" className="input" /><input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Подтвердите пароль" className="input" /><button type="submit" className="btn btn-primary btn-full">Сохранить и войти</button></form></div>); }
 function Dashboard({ projects, token, onSelectProject, onProjectUpdate }: { projects: Project[], token: string, onSelectProject: (project: Project) => void, onProjectUpdate: (projects: Project[]) => void }) { const [newProjectName, setNewProjectName] = useState(''); const [error, setError] = useState(''); const [modalInfo, setModalInfo] = useState<{ isOpen: boolean; projectToDelete: Project | null }>({ isOpen: false, projectToDelete: null }); const handleCreateProject = async (e: React.FormEvent) => { e.preventDefault(); setError(''); if (!newProjectName.trim()) return; if (projects.some(p => p.name.toLowerCase() === newProjectName.trim().toLowerCase())) { setError('Проект с таким названием уже существует.'); return; } try { const response = await axios.post<Project>('/api/projects', { name: newProjectName }, { headers: { Authorization: `Bearer ${token}` } }); onProjectUpdate([...projects, response.data]); setNewProjectName(''); } catch (err) { setError('Не удалось создать проект'); } }; const openDeleteModal = (project: Project) => setModalInfo({ isOpen: true, projectToDelete: project }); const closeDeleteModal = () => setModalInfo({ isOpen: false, projectToDelete: null }); const handleDeleteProject = async () => { if (!modalInfo.projectToDelete) return; try { await axios.delete(`/api/projects/${modalInfo.projectToDelete._id}`, { headers: { Authorization: `Bearer ${token}` } }); onProjectUpdate(projects.filter(p => p._id !== modalInfo.projectToDelete?._id)); closeDeleteModal(); } catch (err) { setError('Не удалось удалить проект'); } }; return (<div className="card"><h1 className="card-title">Ваши проекты</h1>{error && <p className="error-message">{error}</p>}<form onSubmit={handleCreateProject} className="form-row"><input type="text" value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="Название нового проекта" className="input" /><button type="submit" className="btn btn-primary btn-small">Создать</button></form><ul className="project-list">{projects.map((project) => (<li key={project._id} className="project-item" onClick={() => onSelectProject(project)}><span>{project.name}</span><button onClick={(e) => { e.stopPropagation(); openDeleteModal(project); }} className="btn-icon" style={{ color: 'var(--danger-color)' }}><TrashIcon /></button></li>))}</ul><ConfirmationModal isOpen={modalInfo.isOpen} onClose={closeDeleteModal} onConfirm={handleDeleteProject} message={`Вы уверены, что хотите удалить проект "${modalInfo.projectToDelete?.name}"?`} /></div>); }
 function KanbanBoard({ project, token, tasks, members, setTasks }: { project: Project, token: string, tasks: Task[], members: User[], setTasks: React.Dispatch<React.SetStateAction<Task[]>> }) { const [selectedTask, setSelectedTask] = useState<Task | null>(null); const handleTaskUpdated = (updatedTask: Task) => { setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t)); }; const handleTaskDeleted = (taskId: string) => { setTasks(prev => prev.filter(t => t._id !== taskId)); }; return (<div className="kanban-container"><div className="kanban-board">{project.columns.map(column => (<div key={column._id} className="kanban-column"><h3 className="kanban-column-title"><span>{column.name}</span></h3>{tasks.filter(task => column.statusIds.includes(task.status)).map(task => (<div key={task._id} className="task-card" onClick={() => setSelectedTask(task)}><div className="task-title">{task.title}</div><div className="task-meta"><span>{task.assignee?.login || 'Нет'}</span><PriorityIcon priority={task.priority} /></div></div>))}</div>))}</div><TaskDetailModal task={selectedTask} members={members} statuses={project.statuses} onClose={() => setSelectedTask(null)} onUpdate={handleTaskUpdated} onDelete={handleTaskDeleted} token={token} /></div>); }
@@ -166,8 +236,7 @@ export default function App() {
     useEffect(() => {
         const authToken = localStorage.getItem('authToken');
         setToken(authToken);
-        // ВАЖНО: Перед публикацией замените на URL вашего бэкенда
-      axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         if (authToken) {
             setLoading(true);
             axios.get<Project[]>('/api/projects', { headers: { Authorization: `Bearer ${authToken}` } })
@@ -182,7 +251,7 @@ export default function App() {
         } else {
             setLoading(false);
         }
-    }, [token]); // ИЗМЕНЕНО: убрана зависимость от selectedProject, чтобы избежать лишних запросов
+    }, [token]);
 
     useEffect(() => {
         if (selectedProject && token && view === 'board') {
