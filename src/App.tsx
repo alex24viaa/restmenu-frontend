@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'; // ИЗМЕНЕНО: Убр�
 import axios from 'axios';
 import BoardSettings from './features/Settings/BoardSettings';
 import TaskChecklist from './features/Tasks/TaskChecklist'; // ИЗМЕНЕНО: Импортируем новый компонент
-import type { Project, Column, Status, User, Task, ChecklistItem } from './types'; // ИЗМЕНЕНО: Импортируем все типы из одного файла
+import type { Project, Status, User, Task, ChecklistItem } from './types'; // ИЗМЕНЕНО: Импортируем все типы из одного файла
 
 // --- ГЛОБАЛЬНЫЕ СТИЛИ (без изменений) ---
 const GlobalStyles = () => (
@@ -167,7 +167,7 @@ export default function App() {
         const authToken = localStorage.getItem('authToken');
         setToken(authToken);
         // ВАЖНО: Перед публикацией замените на URL вашего бэкенда
-        axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+      axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         if (authToken) {
             setLoading(true);
             axios.get<Project[]>('/api/projects', { headers: { Authorization: `Bearer ${authToken}` } })

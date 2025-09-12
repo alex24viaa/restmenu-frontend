@@ -1,8 +1,6 @@
 // НОВЫЙ ФАЙЛ: src/types.ts
 // Здесь хранятся все общие типы данных для вашего приложения.
 
-import { v4 as uuidv4 } from 'uuid';
-
 export interface ChecklistItem {
   id: string;
   text: string;
