@@ -22,8 +22,13 @@ export interface Column {
 export interface Project {
   _id: string;
   name: string;
+  owner?: User;
   columns: Column[];
   statuses: Status[];
+  members: Array<{
+    user: User;
+    role: 'admin' | 'member';
+  }>;
 }
 
 export interface User {

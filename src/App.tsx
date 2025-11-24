@@ -252,10 +252,36 @@ function Dashboard({ projects, token, onSelectProject, onProjectUpdate }: {
     };
     const currentUserId = getUserIdFromToken(token);
 
-    const handleCreateProject = async (e: React.FormEvent) => { /* ... код без изменений ... */ };
+    const handleCreateProject = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (!newProjectName.trim()) {
+            setError('Название проекта обязательно.');
+            return;
+        }
+        try {
+            const response = await axios.post<Project>('/api/projects', { name: newProjectName.trim() }, { headers: { Authorization: `Bearer ${token}` } });
+            onProjectUpdate([...projects, response.data]);
+            setNewProjectName('');
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Не удалось создать проект.');
+        }
+    };
+
     const openDeleteModal = (project: Project) => setModalInfo({ isOpen: true, projectToDelete: project });
     const closeDeleteModal = () => setModalInfo({ isOpen: false, projectToDelete: null });
-    const handleDeleteProject = async () => { /* ... код без изменений ... */ };
+    
+    const handleDeleteProject = async () => {
+        if (!modalInfo.projectToDelete) return;
+        try {
+            await axios.delete(`/api/projects/${modalInfo.projectToDelete._id}`, { headers: { Authorization: `Bearer ${token}` } });
+            onProjectUpdate(projects.filter(p => p._id !== modalInfo.projectToDelete!._id));
+            closeDeleteModal();
+        } catch (err: any) {
+            setError(err.response?.data?.message || 'Не удалось удалить проект.');
+            closeDeleteModal();
+        }
+    };
 
     return (
         <div className="card">
@@ -362,7 +388,69 @@ export default function App() {
         if (isSettingsDirty) { setPendingNavigation(() => navigate); setConfirmNavOpen(true); } else { navigate(); }
     };
 
-  
+    const handleGoToDashboard = () => {
+        const navigate = () => { setView('dashboard'); setSettingsDirty(false); };
+        if (isSettingsDirty) { setPendingNavigation(() => navigate); setConfirmNavOpen(true); } else { navigate(); }
+    };
+
+    const handleGoToSettings = () => {
+        const navigate = () => { setView('settings'); };
+        if (isSettingsDirty) { setPendingNavigation(() => navigate); setConfirmNavOpen(true); } else { navigate(); }
+    };
+
+    const confirmAndNavigate = () => {
+        if (pendingNavigation) {
+            pendingNavigation();
+            setPendingNavigation(null);
+        }
+        setConfirmNavOpen(false);
+    };
+
+    const handleTaskCreated = (newTask: Task) => {
+        setTasks(prev => [...prev, newTask]);
+        setCreateModalOpen(false);
+    };
+
+    const handleProjectUpdate = (updatedProjects: Project[]) => {
+        setProjects(updatedProjects);
+    };
+
+    const handleSettingsChange = (updatedProject: Project) => {
+        setSelectedProject(updatedProject);
+        setProjects(prev => prev.map(p => p._id === updatedProject._id ? updatedProject : p));
+        setSettingsDirty(false);
+    };
+
+    const renderContent = () => {
+        if (loading) {
+            return <div>Загрузка...</div>;
+        }
+
+        if (view === 'setPassword' && tempToken) {
+            return <SetPasswordPage onPasswordSet={handleLogin} tempToken={tempToken} />;
+        }
+
+        if (!token) {
+            return <LoginPage onLogin={handleLogin} onRequireSetPassword={handleRequireSetPassword} />;
+        }
+
+        if (view === 'dashboard') {
+            return <Dashboard projects={projects} token={token} onSelectProject={handleSelectProject} onProjectUpdate={handleProjectUpdate} />;
+        }
+
+        if (view === 'settings' && selectedProject) {
+            return <BoardSettings project={selectedProject} token={token} onSettingsChange={handleSettingsChange} onDirtyChange={setSettingsDirty} />;
+        }
+
+        if (view === 'board' && selectedProject) {
+            if (boardLoading) {
+                return <div>Загрузка доски...</div>;
+            }
+            return <KanbanBoard project={selectedProject} token={token} tasks={tasks} members={members} setTasks={setTasks} />;
+        }
+
+        return <div>Выберите проект</div>;
+    };
 
     const showHeader = token && selectedProject;
 
