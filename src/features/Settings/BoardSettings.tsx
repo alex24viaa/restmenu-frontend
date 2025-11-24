@@ -129,34 +129,57 @@ export default function BoardSettings({ project, token, onSettingsChange, onDirt
             <div className="settings-section" style={{marginTop: '20px'}}>
                 <h3>Участники</h3>
                 <ul className="project-list" style={{marginTop: 0}}>
-                    {project.members.map(({ user, role }) => {
-                        const isUserOwner = project.owner && project.owner._id === user._id;
-                        return (
-                            <li key={user._id} className="project-item">
-                                <div>
-                                    <span>{user.login}</span>
-                                    {isUserOwner && (
-                                        <span style={{ marginLeft: '10px', padding: '2px 6px', background: '#fef3c7', color: '#d97706', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
-                                            создатель
-                                        </span>
-                                    )}
-                                    <span style={{ marginLeft: '10px', padding: '2px 6px', background: role === 'admin' ? '#e0f2fe' : '#f3f4f6', color: role === 'admin' ? '#0ea5e9' : '#4b5563', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
-                                        {role}
-                                    </span>
-                                </div>
-                                {currentUserIsAdmin && currentUserId !== user._id && !isUserOwner && (
-                                    <div style={{display: 'flex', gap: '10px'}}>
-                                        {role === 'member' ? (
-                                            <button onClick={() => handleChangeRole(user._id, 'admin')} className="btn-light btn-small">Сделать админом</button>
-                                        ) : (
-                                            <button onClick={() => handleChangeRole(user._id, 'member')} className="btn-light btn-small">Снять права</button>
+                    {(() => {
+                        // Убеждаемся, что owner всегда в списке
+                        let membersToShow = project.members || [];
+                        if (project.owner) {
+                            const ownerId = project.owner._id;
+                            const ownerInMembers = membersToShow.some(m => m.user._id === ownerId);
+                            if (!ownerInMembers) {
+                                membersToShow = [
+                                    { user: project.owner, role: 'admin' as const },
+                                    ...membersToShow
+                                ];
+                            }
+                        }
+                        
+                        if (membersToShow.length === 0) {
+                            return (
+                                <li className="project-item" style={{ color: '#6c757d', fontStyle: 'italic' }}>
+                                    Нет участников
+                                </li>
+                            );
+                        }
+                        
+                        return membersToShow.map(({ user, role }) => {
+                            const isUserOwner = project.owner && project.owner._id === user._id;
+                            return (
+                                <li key={user._id} className="project-item">
+                                    <div>
+                                        <span>{user.login}</span>
+                                        {isUserOwner && (
+                                            <span style={{ marginLeft: '10px', padding: '2px 6px', background: '#fef3c7', color: '#d97706', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                                                создатель
+                                            </span>
                                         )}
-                                        <button onClick={() => handleRemoveMember(user._id)} className="btn-danger btn-small">Удалить</button>
+                                        <span style={{ marginLeft: '10px', padding: '2px 6px', background: role === 'admin' ? '#e0f2fe' : '#f3f4f6', color: role === 'admin' ? '#0ea5e9' : '#4b5563', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}>
+                                            {role}
+                                        </span>
                                     </div>
-                                )}
-                            </li>
-                        );
-                    })}
+                                    {currentUserIsAdmin && currentUserId !== user._id && !isUserOwner && (
+                                        <div style={{display: 'flex', gap: '10px'}}>
+                                            {role === 'member' ? (
+                                                <button onClick={() => handleChangeRole(user._id, 'admin')} className="btn-light btn-small">Сделать админом</button>
+                                            ) : (
+                                                <button onClick={() => handleChangeRole(user._id, 'member')} className="btn-light btn-small">Снять права</button>
+                                            )}
+                                            <button onClick={() => handleRemoveMember(user._id)} className="btn-danger btn-small">Удалить</button>
+                                        </div>
+                                    )}
+                                </li>
+                            );
+                        });
+                    })()}
                 </ul>
 
                 {currentUserIsAdmin && (

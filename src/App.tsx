@@ -346,9 +346,27 @@ export default function App() {
             setLoading(true);
             axios.get<Project[]>('/api/projects', { headers: { Authorization: `Bearer ${authToken}` } })
                 .then(response => {
-                    setProjects(response.data);
-                    if (response.data.length > 0 && !selectedProject) {
-                        handleSelectProject(response.data[0]);
+                    // Убеждаемся, что owner всегда в списке участников для каждого проекта
+                    const projectsWithOwner = response.data.map(project => {
+                        if (!project.owner || !project.members) {
+                            return project;
+                        }
+                        const ownerId = project.owner._id;
+                        const ownerInMembers = project.members.some(m => m.user._id === ownerId);
+                        if (!ownerInMembers) {
+                            return {
+                                ...project,
+                                members: [
+                                    { user: project.owner, role: 'admin' as const },
+                                    ...project.members
+                                ]
+                            };
+                        }
+                        return project;
+                    });
+                    setProjects(projectsWithOwner);
+                    if (projectsWithOwner.length > 0 && !selectedProject) {
+                        handleSelectProject(projectsWithOwner[0]);
                     }
                 })
                 .catch(() => handleLogout())
@@ -384,7 +402,12 @@ export default function App() {
     const handleLogout = () => { localStorage.removeItem('authToken'); setToken(null); setTempToken(null); setSelectedProject(null); setProjects([]); setView('dashboard'); };
 
     const handleSelectProject = (project: Project) => {
-        const navigate = () => { setSelectedProject(project); setView('board'); setSettingsDirty(false); };
+        const navigate = () => { 
+            const projectWithOwner = ensureOwnerInMembers(project);
+            setSelectedProject(projectWithOwner); 
+            setView('board'); 
+            setSettingsDirty(false); 
+        };
         if (isSettingsDirty) { setPendingNavigation(() => navigate); setConfirmNavOpen(true); } else { navigate(); }
     };
 
@@ -416,9 +439,33 @@ export default function App() {
     };
 
     const handleSettingsChange = (updatedProject: Project) => {
-        setSelectedProject(updatedProject);
-        setProjects(prev => prev.map(p => p._id === updatedProject._id ? updatedProject : p));
+        // Убеждаемся, что owner всегда в списке участников
+        const projectWithOwner = ensureOwnerInMembers(updatedProject);
+        setSelectedProject(projectWithOwner);
+        setProjects(prev => prev.map(p => p._id === projectWithOwner._id ? projectWithOwner : ensureOwnerInMembers(p)));
         setSettingsDirty(false);
+    };
+
+    // Вспомогательная функция для гарантии, что owner всегда в members
+    const ensureOwnerInMembers = (project: Project): Project => {
+        if (!project.owner || !project.members) {
+            return project;
+        }
+        
+        const ownerId = project.owner._id;
+        const ownerInMembers = project.members.some(m => m.user._id === ownerId);
+        
+        if (!ownerInMembers) {
+            return {
+                ...project,
+                members: [
+                    { user: project.owner, role: 'admin' as const },
+                    ...project.members
+                ]
+            };
+        }
+        
+        return project;
     };
 
     const renderContent = () => {
